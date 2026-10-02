@@ -13,7 +13,8 @@ import {
   Calendar,
   X
 } from 'lucide-react';
-import { studentsApi } from '../services/api';
+import { studentsApi, classesApi } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import StudentForm from '../components/StudentForm';
@@ -23,10 +24,12 @@ import { useToast } from '../components/Toast';
 import { formatDate, getStatusBadgeClass } from '../utils/helpers';
 
 const Students = () => {
+  const { isAdmin, isTeacher } = useAuth();
   const [students, setStudents] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [courseFilter, setCourseFilter] = useState('');
+  const [classFilter, setClassFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
   // Modals state
@@ -39,12 +42,21 @@ const Students = () => {
 
   const toast = useToast();
 
+  const loadClasses = async () => {
+    try {
+      const res = await classesApi.getAll();
+      if (res.success) setClasses(res.data);
+    } catch (err) {
+      console.error('Error fetching classes:', err);
+    }
+  };
+
   const fetchStudents = async () => {
     try {
       setLoading(true);
       const params = {};
       if (search.trim()) params.search = search.trim();
-      if (courseFilter) params.course = courseFilter;
+      if (classFilter) params.classId = classFilter;
       if (statusFilter) params.status = statusFilter;
 
       const res = await studentsApi.getAll(params);
@@ -59,12 +71,16 @@ const Students = () => {
   };
 
   useEffect(() => {
+    loadClasses();
+  }, []);
+
+  useEffect(() => {
     const timer = setTimeout(() => {
       fetchStudents();
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [search, courseFilter, statusFilter]);
+  }, [search, classFilter, statusFilter]);
 
   // Create Student
   const handleAddStudent = async (formData) => {
@@ -102,9 +118,9 @@ const Students = () => {
     }
   };
 
-  // Delete Student
+  // Delete Student (Admin Only)
   const handleDeleteStudent = async () => {
-    if (!selectedStudent) return;
+    if (!selectedStudent || !isAdmin) return;
     try {
       setActionLoading(true);
       const res = await studentsApi.delete(selectedStudent._id);
@@ -146,7 +162,7 @@ const Students = () => {
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
               type="text"
-              placeholder="Search by student name, email, or course..."
+              placeholder="Search students by name, email, or course..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="input-field pl-10"
@@ -166,17 +182,16 @@ const Students = () => {
             <div className="flex items-center gap-2">
               <Filter size={16} className="text-gray-400" />
               <select
-                value={courseFilter}
-                onChange={(e) => setCourseFilter(e.target.value)}
+                value={classFilter}
+                onChange={(e) => setClassFilter(e.target.value)}
                 className="input-field py-2 text-xs font-medium w-auto bg-white"
               >
-                <option value="">All Courses</option>
-                <option value="Full-Stack Web Development">Web Development</option>
-                <option value="Data Science & AI">Data Science</option>
-                <option value="UI/UX Product Design">UI/UX Design</option>
-                <option value="Cybersecurity Analyst">Cybersecurity</option>
-                <option value="Cloud & DevOps Engineering">Cloud/DevOps</option>
-                <option value="Mobile App Development">Mobile Apps</option>
+                <option value="">{isTeacher ? 'All My Classes' : 'All Classes'}</option>
+                {classes.map((cls) => (
+                  <option key={cls._id} value={cls._id}>
+                    {cls.name} ({cls.grade})
+                  </option>
+                ))}
               </select>
 
               <select
@@ -206,7 +221,9 @@ const Students = () => {
       <div className="card overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h3 className="text-base font-bold text-gray-900">Enrolled Students</h3>
+            <h3 className="text-base font-bold text-gray-900">
+              {isTeacher ? 'My Students' : 'Enrolled Students'}
+            </h3>
             <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
               {students.length}
             </span>
@@ -218,11 +235,11 @@ const Students = () => {
         ) : students.length === 0 ? (
           <EmptyState
             icon={Users}
-            title="No students found"
+            title={isTeacher ? 'No Students in Your Classes' : 'No Students Found'}
             description={
-              search || courseFilter || statusFilter
-                ? 'Try tweaking your search keywords or filter criteria.'
-                : 'Get started by creating your first student record in Smart Academy.'
+              search || classFilter || statusFilter
+                ? 'Try adjusting your search keywords or filter criteria.'
+                : 'Get started by enrolling students into a class.'
             }
             action={
               <button onClick={() => setIsAddModalOpen(true)} className="btn-primary">
@@ -239,7 +256,7 @@ const Students = () => {
                   <th className="py-3 px-6">Student ID</th>
                   <th className="py-3 px-6">Full Name</th>
                   <th className="py-3 px-6">Contact Info</th>
-                  <th className="py-3 px-6">Course / Class</th>
+                  <th className="py-3 px-6">Assigned Class</th>
                   <th className="py-3 px-6">Enrolled</th>
                   <th className="py-3 px-6">Status</th>
                   <th className="py-3 px-6 text-right">Actions</th>
@@ -273,9 +290,15 @@ const Students = () => {
                       )}
                     </td>
 
-                    {/* Course */}
+                    {/* Class */}
                     <td className="py-4 px-6">
-                      <span className="font-medium text-gray-700">{student.course}</span>
+                      {student.classId ? (
+                        <span className="font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 text-xs">
+                          {student.classId.name || student.classId}
+                        </span>
+                      ) : (
+                        <span className="text-gray-600 text-xs">{student.course || 'General'}</span>
+                      )}
                     </td>
 
                     {/* Enrollment */}
@@ -307,13 +330,15 @@ const Students = () => {
                         >
                           <Pencil size={17} />
                         </button>
-                        <button
-                          onClick={() => openDeleteDialog(student)}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                          title="Delete Student"
-                        >
-                          <Trash2 size={17} />
-                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => openDeleteDialog(student)}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                            title="Delete Student"
+                          >
+                            <Trash2 size={17} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -331,6 +356,7 @@ const Students = () => {
         title="Add New Student"
       >
         <StudentForm
+          availableClasses={classes}
           onSubmit={handleAddStudent}
           onCancel={() => setIsAddModalOpen(false)}
           loading={actionLoading}
@@ -348,6 +374,7 @@ const Students = () => {
       >
         <StudentForm
           initialValues={selectedStudent}
+          availableClasses={classes}
           onSubmit={handleEditStudent}
           onCancel={() => {
             setIsEditModalOpen(false);
@@ -403,9 +430,11 @@ const Students = () => {
 
               <div className="p-3 rounded-xl bg-gray-50 border border-gray-100">
                 <span className="text-xs font-semibold uppercase text-gray-400 flex items-center gap-1.5 mb-1">
-                  <BookOpen size={13} /> Course
+                  <BookOpen size={13} /> Academic Class
                 </span>
-                <p className="font-medium text-gray-800">{selectedStudent.course}</p>
+                <p className="font-medium text-gray-800">
+                  {selectedStudent.classId?.name || selectedStudent.course || 'General'}
+                </p>
               </div>
 
               <div className="p-3 rounded-xl bg-gray-50 border border-gray-100">
@@ -432,19 +461,21 @@ const Students = () => {
         )}
       </Modal>
 
-      {/* Delete Confirmation Dialog */}
-      <ConfirmDialog
-        isOpen={isDeleteDialogOpen}
-        onClose={() => {
-          setIsDeleteDialogOpen(false);
-          setSelectedStudent(null);
-        }}
-        onConfirm={handleDeleteStudent}
-        title="Delete Student"
-        message={`Are you sure you want to delete ${selectedStudent?.fullName}? All associated attendance logs will also be permanently deleted.`}
-        confirmText="Delete Student"
-        loading={actionLoading}
-      />
+      {/* Delete Confirmation Dialog (Admin Only) */}
+      {isAdmin && (
+        <ConfirmDialog
+          isOpen={isDeleteDialogOpen}
+          onClose={() => {
+            setIsDeleteDialogOpen(false);
+            setSelectedStudent(null);
+          }}
+          onConfirm={handleDeleteStudent}
+          title="Delete Student"
+          message={`Are you sure you want to delete ${selectedStudent?.fullName}? All associated attendance logs will also be permanently deleted.`}
+          confirmText="Delete Student"
+          loading={actionLoading}
+        />
+      )}
     </div>
   );
 };

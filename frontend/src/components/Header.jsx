@@ -1,10 +1,19 @@
-import { useLocation } from 'react-router-dom';
-import { Menu, Bell, Sparkles } from 'lucide-react';
+import { useLocation, Link, useNavigate } from 'react-router-dom';
+import { Menu, LogOut, User, Sparkles } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const routeMetadata = {
   '/dashboard': {
     title: 'Dashboard Overview',
-    description: 'Monitor real-time student engagement and daily attendance rates.'
+    description: 'Monitor student engagement and daily attendance rates.'
+  },
+  '/teachers': {
+    title: 'Faculty & Teachers',
+    description: 'Manage teacher accounts, class allocations, and credentials.'
+  },
+  '/classes': {
+    title: 'Academic Classes',
+    description: 'Manage class sections, grade cohorts, and teacher assignments.'
   },
   '/students': {
     title: 'Student Directory',
@@ -21,14 +30,26 @@ const routeMetadata = {
   '/settings': {
     title: 'System Settings',
     description: 'Configure institution profile, parameters, and display options.'
+  },
+  '/profile': {
+    title: 'Staff Profile',
+    description: 'View your profile information and update login credentials.'
   }
 };
 
 const Header = ({ onMenuClick }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, isAdmin, logout } = useAuth();
+
   const meta = routeMetadata[location.pathname] || {
     title: 'Smart Academy',
     description: 'Student Attendance Management Platform'
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
   };
 
   return (
@@ -53,29 +74,39 @@ const Header = ({ onMenuClick }) => {
           </div>
         </div>
 
-        {/* Right Action Icons */}
+        {/* Right User Bar */}
         <div className="flex items-center gap-3 flex-shrink-0">
           <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold border border-blue-200">
             <Sparkles size={14} />
-            <span>Bootcamp Edition</span>
+            <span>Smart Academy</span>
           </div>
 
-          <button
-            className="relative p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-            title="Notifications"
-          >
-            <Bell size={20} />
-            <span className="absolute top-2 right-2 w-2 h-2 bg-blue-600 rounded-full ring-2 ring-white"></span>
-          </button>
-
           <div className="flex items-center gap-3 pl-2 border-l border-gray-200">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold flex items-center justify-center text-sm shadow-sm">
-              A
-            </div>
-            <div className="hidden sm:block text-left">
-              <p className="text-xs font-semibold text-gray-800 leading-tight">Smart Academy Admin</p>
-              <p className="text-[11px] text-gray-500">Administrator</p>
-            </div>
+            <Link
+              to={isAdmin ? '/settings' : '/profile'}
+              className="flex items-center gap-2.5 hover:opacity-85 transition-opacity"
+              title="View Profile"
+            >
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold flex items-center justify-center text-sm shadow-sm">
+                {user?.name?.charAt(0) || 'U'}
+              </div>
+              <div className="hidden sm:block text-left">
+                <p className="text-xs font-bold text-gray-900 leading-tight">
+                  {isAdmin ? 'Smart Academy Admin' : user?.name || 'Teacher'}
+                </p>
+                <p className="text-[11px] text-blue-600 font-semibold uppercase tracking-wider">
+                  {isAdmin ? 'Administrator' : 'Teacher'}
+                </p>
+              </div>
+            </Link>
+
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-xl text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+              title="Sign Out"
+            >
+              <LogOut size={18} />
+            </button>
           </div>
         </div>
       </div>

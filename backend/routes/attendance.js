@@ -8,6 +8,10 @@ const {
   updateAttendance,
   deleteAttendance
 } = require('../controllers/attendanceController');
+const { requireAuth } = require('../middleware/auth');
+
+// All attendance operations require authentication
+router.use(requireAuth);
 
 router.route('/')
   .get(getAttendance)

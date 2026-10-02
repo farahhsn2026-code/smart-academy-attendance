@@ -6,21 +6,19 @@ const initialFormData = {
   email: '',
   phone: '',
   gender: 'Prefer not to say',
-  course: 'Full-Stack Web Development',
+  course: '',
+  classId: '',
   enrollmentDate: new Date().toISOString().split('T')[0],
   status: 'Active'
 };
 
-const COURSES = [
-  'Full-Stack Web Development',
-  'Data Science & AI',
-  'UI/UX Product Design',
-  'Cybersecurity Analyst',
-  'Cloud & DevOps Engineering',
-  'Mobile App Development'
-];
-
-const StudentForm = ({ initialValues, onSubmit, onCancel, loading = false }) => {
+const StudentForm = ({
+  initialValues,
+  availableClasses = [],
+  onSubmit,
+  onCancel,
+  loading = false
+}) => {
   const [formData, setFormData] = useState(initialFormData);
   const [errors, setErrors] = useState({});
 
@@ -31,12 +29,20 @@ const StudentForm = ({ initialValues, onSubmit, onCancel, loading = false }) => 
         email: initialValues.email || '',
         phone: initialValues.phone || '',
         gender: initialValues.gender || 'Prefer not to say',
-        course: initialValues.course || COURSES[0],
+        course: initialValues.course || '',
+        classId: initialValues.classId?._id || initialValues.classId || '',
         enrollmentDate: formatDateInput(initialValues.enrollmentDate) || new Date().toISOString().split('T')[0],
         status: initialValues.status || 'Active'
       });
+    } else if (availableClasses.length > 0 && !formData.classId) {
+      // Default to first available class if adding new
+      setFormData((prev) => ({
+        ...prev,
+        classId: availableClasses[0]._id,
+        course: availableClasses[0].name
+      }));
     }
-  }, [initialValues]);
+  }, [initialValues, availableClasses]);
 
   const validate = () => {
     const newErrors = {};
@@ -48,15 +54,22 @@ const StudentForm = ({ initialValues, onSubmit, onCancel, loading = false }) => 
     } else if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
       newErrors.email = 'Please provide a valid email format';
     }
-    if (!formData.course.trim()) {
-      newErrors.course = 'Please select a course';
-    }
     return newErrors;
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (name === 'classId') {
+      const selectedCls = availableClasses.find((c) => c._id === value);
+      setFormData((prev) => ({
+        ...prev,
+        classId: value,
+        course: selectedCls ? selectedCls.name : prev.course
+      }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: null }));
     }
@@ -120,7 +133,7 @@ const StudentForm = ({ initialValues, onSubmit, onCancel, loading = false }) => 
         </div>
       </div>
 
-      {/* Gender & Course */}
+      {/* Gender & Assigned Class */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="label">Gender</label>
@@ -139,21 +152,21 @@ const StudentForm = ({ initialValues, onSubmit, onCancel, loading = false }) => 
 
         <div>
           <label className="label">
-            Course / Cohort <span className="text-red-500">*</span>
+            Academic Class <span className="text-red-500">*</span>
           </label>
           <select
-            name="course"
-            value={formData.course}
+            name="classId"
+            value={formData.classId}
             onChange={handleChange}
-            className={`input-field bg-white ${errors.course ? 'border-red-500' : ''}`}
+            className="input-field bg-white"
           >
-            {COURSES.map((course) => (
-              <option key={course} value={course}>
-                {course}
+            <option value="">-- Select Class --</option>
+            {availableClasses.map((cls) => (
+              <option key={cls._id} value={cls._id}>
+                {cls.name} ({cls.grade} - Sec {cls.section})
               </option>
             ))}
           </select>
-          {errors.course && <p className="text-xs text-red-500 mt-1">{errors.course}</p>}
         </div>
       </div>
 

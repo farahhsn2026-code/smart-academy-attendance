@@ -14,7 +14,7 @@ import { useToast } from '../components/Toast';
 const Settings = () => {
   const [institutionName, setInstitutionName] = useState('Smart Academy');
   const [academicTerm, setAcademicTerm] = useState('Fall 2026 / Spring 2027');
-  const [adminEmail, setAdminEmail] = useState('hasanfaarah07@gmail.com.edu');
+  const [adminEmail, setAdminEmail] = useState('hasanfaarah07@gmail.com');
   const [lateThreshold, setLateThreshold] = useState('15');
   const [theme, setTheme] = useState('light');
   const [autoSaveNotification, setAutoSaveNotification] = useState(true);

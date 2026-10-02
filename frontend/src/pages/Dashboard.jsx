@@ -1,13 +1,25 @@
 import { useState, useEffect } from 'react';
-import { Users, UserCheck, UserX, Clock, Calendar, ArrowRight, RefreshCw, BarChart2 } from 'lucide-react';
+import {
+  Users,
+  UserCheck,
+  UserX,
+  Clock,
+  Calendar,
+  ArrowRight,
+  RefreshCw,
+  BookOpen,
+  UserCog
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { dashboardApi } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import StatCard from '../components/StatCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { formatDate, getStatusBadgeClass } from '../utils/helpers';
 import { useToast } from '../components/Toast';
 
 const Dashboard = () => {
+  const { user, isAdmin } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
@@ -51,9 +63,13 @@ const Dashboard = () => {
               <Calendar size={14} />
               <span>{todayFormatted}</span>
             </div>
-            <h2 className="text-2xl font-bold tracking-tight">Welcome to Smart Academy</h2>
+            <h2 className="text-2xl font-bold tracking-tight">
+              Welcome, {user?.name || 'Staff Member'}!
+            </h2>
             <p className="text-blue-100 text-sm mt-1 max-w-xl">
-              Track attendance, monitor student records, and analyze classroom engagement in real-time.
+              {isAdmin
+                ? 'Smart Academy Institution Portal: Monitor system-wide teachers, cohorts, and daily student attendance.'
+                : 'Smart Academy Teacher Portal: Review your assigned classes, track student presence, and record attendance.'}
             </p>
           </div>
 
@@ -69,44 +85,98 @@ const Dashboard = () => {
               to="/attendance"
               className="px-4 py-2.5 rounded-xl bg-white text-blue-600 hover:bg-blue-50 font-semibold text-sm transition-all shadow-sm flex items-center gap-2"
             >
-              <span>Mark Attendance</span>
+              <span>Record Attendance</span>
               <ArrowRight size={16} />
             </Link>
           </div>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Total Students"
-          value={stats?.totalStudents ?? 0}
-          subtitle={`${stats?.activeStudents ?? 0} Active students`}
-          icon={Users}
-          color="blue"
-        />
-        <StatCard
-          title="Present Today"
-          value={stats?.presentToday ?? 0}
-          subtitle={`${stats?.todayAttendanceRate ?? 0}% Attendance rate`}
-          icon={UserCheck}
-          color="emerald"
-        />
-        <StatCard
-          title="Absent Today"
-          value={stats?.absentToday ?? 0}
-          subtitle="Requires follow-up"
-          icon={UserX}
-          color="rose"
-        />
-        <StatCard
-          title="Late Today"
-          value={stats?.lateToday ?? 0}
-          subtitle="Arrived after bell"
-          icon={Clock}
-          color="amber"
-        />
-      </div>
+      {/* KPI Cards based on Role */}
+      {isAdmin ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+          <StatCard
+            title="Total Teachers"
+            value={stats?.totalTeachers ?? 0}
+            subtitle="Faculty members"
+            icon={UserCog}
+            color="indigo"
+          />
+          <StatCard
+            title="Total Classes"
+            value={stats?.totalClasses ?? 0}
+            subtitle="Active cohorts"
+            icon={BookOpen}
+            color="blue"
+          />
+          <StatCard
+            title="Total Students"
+            value={stats?.totalStudents ?? 0}
+            subtitle={`${stats?.activeStudents ?? 0} Active`}
+            icon={Users}
+            color="blue"
+          />
+          <StatCard
+            title="Present Today"
+            value={stats?.presentToday ?? 0}
+            subtitle={`${stats?.todayAttendanceRate ?? 0}% Rate`}
+            icon={UserCheck}
+            color="emerald"
+          />
+          <StatCard
+            title="Late Today"
+            value={stats?.lateToday ?? 0}
+            subtitle="Tardy arrivals"
+            icon={Clock}
+            color="amber"
+          />
+          <StatCard
+            title="Absent Today"
+            value={stats?.absentToday ?? 0}
+            subtitle="Unexcused / Out"
+            icon={UserX}
+            color="rose"
+          />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+          <StatCard
+            title="My Classes"
+            value={stats?.totalClasses ?? 0}
+            subtitle="Assigned sections"
+            icon={BookOpen}
+            color="indigo"
+          />
+          <StatCard
+            title="My Students"
+            value={stats?.totalStudents ?? 0}
+            subtitle={`${stats?.activeStudents ?? 0} Active`}
+            icon={Users}
+            color="blue"
+          />
+          <StatCard
+            title="Today's Present"
+            value={stats?.presentToday ?? 0}
+            subtitle={`${stats?.todayAttendanceRate ?? 0}% Rate`}
+            icon={UserCheck}
+            color="emerald"
+          />
+          <StatCard
+            title="Today's Late"
+            value={stats?.lateToday ?? 0}
+            subtitle="Arrived late"
+            icon={Clock}
+            color="amber"
+          />
+          <StatCard
+            title="Today's Absent"
+            value={stats?.absentToday ?? 0}
+            subtitle="Marked absent"
+            icon={UserX}
+            color="rose"
+          />
+        </div>
+      )}
 
       {/* 7-Day Trend Chart & Summary */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -115,7 +185,9 @@ const Dashboard = () => {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-base font-bold text-gray-900">Attendance Overview</h3>
-              <p className="text-xs text-gray-500 mt-0.5">7-Day Attendance Volume</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {isAdmin ? 'System-Wide 7-Day Volume' : 'My Classes 7-Day Volume'}
+              </p>
             </div>
             <div className="flex items-center gap-3 text-xs">
               <span className="flex items-center gap-1.5 font-medium text-emerald-600">
@@ -147,12 +219,10 @@ const Dashboard = () => {
 
                 return (
                   <div key={day.date} className="flex-1 flex flex-col items-center h-full justify-end group">
-                    {/* Tooltip on Hover */}
                     <div className="text-[11px] font-semibold text-gray-700 mb-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {total}
                     </div>
 
-                    {/* Stacked Bar */}
                     <div
                       style={{ height: `${Math.max(heightPct, 6)}%` }}
                       className="w-full max-w-[38px] rounded-lg overflow-hidden flex flex-col-reverse shadow-sm bg-gray-100"
@@ -162,7 +232,6 @@ const Dashboard = () => {
                       <div style={{ height: `${absPct}%` }} className="bg-rose-500 w-full" />
                     </div>
 
-                    {/* Day name */}
                     <span className="text-[11px] font-medium text-gray-500 mt-2 truncate">
                       {dayLabel}
                     </span>
@@ -181,7 +250,7 @@ const Dashboard = () => {
         <div className="card p-6 flex flex-col justify-between">
           <div>
             <h3 className="text-base font-bold text-gray-900 mb-1">Performance Summary</h3>
-            <p className="text-xs text-gray-500 mb-6">Cumulative academic metrics</p>
+            <p className="text-xs text-gray-500 mb-6">Cumulative academic engagement</p>
 
             <div className="flex flex-col items-center justify-center my-4">
               <div className="relative w-36 h-36 flex items-center justify-center">
@@ -237,13 +306,15 @@ const Dashboard = () => {
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
             <h3 className="text-base font-bold text-gray-900">Recent Attendance Records</h3>
-            <p className="text-xs text-gray-500 mt-0.5">Latest attendance submissions recorded</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {isAdmin ? 'System-wide latest attendance submissions' : 'Latest records for my classes'}
+            </p>
           </div>
           <Link
             to="/reports"
             className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
           >
-            <span>View All</span>
+            <span>View Reports</span>
             <ArrowRight size={14} />
           </Link>
         </div>
@@ -253,7 +324,7 @@ const Dashboard = () => {
             <thead>
               <tr className="bg-gray-50/75 border-b border-gray-100 text-xs uppercase tracking-wider text-gray-500 font-semibold">
                 <th className="py-3 px-6">Student</th>
-                <th className="py-3 px-6">Course / Class</th>
+                <th className="py-3 px-6">Class / Course</th>
                 <th className="py-3 px-6">Date</th>
                 <th className="py-3 px-6">Status</th>
               </tr>
@@ -264,12 +335,12 @@ const Dashboard = () => {
                   <tr key={rec._id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="py-3.5 px-6">
                       <div className="font-medium text-gray-900">
-                        {rec.student?.fullName || 'Unknown Student'}
+                        {rec.student?.fullName || 'Student'}
                       </div>
                       <div className="text-xs text-gray-500">{rec.student?.email}</div>
                     </td>
                     <td className="py-3.5 px-6 text-gray-600">
-                      {rec.student?.course || 'General'}
+                      {rec.classId?.name || rec.student?.course || 'General'}
                     </td>
                     <td className="py-3.5 px-6 text-gray-600">
                       {formatDate(rec.date)}

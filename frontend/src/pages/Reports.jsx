@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   BarChart3,
-  Calendar,
   Filter,
-  Users,
   CheckCircle2,
   AlertCircle,
   Clock,
@@ -11,22 +9,26 @@ import {
   ChevronLeft,
   ChevronRight,
   TrendingUp,
-  Download
+  BookOpen
 } from 'lucide-react';
-import { dashboardApi, attendanceApi } from '../services/api';
+import { dashboardApi, attendanceApi, classesApi } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
 import { formatDate, getStatusBadgeClass } from '../utils/helpers';
 import { useToast } from '../components/Toast';
 
 const Reports = () => {
+  const { isAdmin, isTeacher } = useAuth();
   const [stats, setStats] = useState(null);
   const [history, setHistory] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
   // Filter params
   const [search, setSearch] = useState('');
+  const [classFilter, setClassFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -35,6 +37,15 @@ const Reports = () => {
   const [totalRecords, setTotalRecords] = useState(0);
 
   const toast = useToast();
+
+  const loadClasses = async () => {
+    try {
+      const res = await classesApi.getAll();
+      if (res.success) setClasses(res.data);
+    } catch (err) {
+      console.error('Error fetching classes:', err);
+    }
+  };
 
   const fetchStats = async () => {
     try {
@@ -58,6 +69,7 @@ const Reports = () => {
         limit: 15
       };
 
+      if (classFilter) params.classId = classFilter;
       if (statusFilter) params.status = statusFilter;
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
@@ -76,22 +88,25 @@ const Reports = () => {
   };
 
   useEffect(() => {
+    loadClasses();
     fetchStats();
   }, []);
 
   useEffect(() => {
     fetchHistory();
-  }, [page, statusFilter, startDate, endDate]);
+  }, [page, classFilter, statusFilter, startDate, endDate]);
 
   const filteredHistory = history.filter((rec) => {
     if (!search.trim()) return true;
     const name = rec.student?.fullName?.toLowerCase() || '';
     const course = rec.student?.course?.toLowerCase() || '';
-    return name.includes(search.toLowerCase()) || course.includes(search.toLowerCase());
+    const className = rec.classId?.name?.toLowerCase() || '';
+    return name.includes(search.toLowerCase()) || course.includes(search.toLowerCase()) || className.includes(search.toLowerCase());
   });
 
   const clearFilters = () => {
     setSearch('');
+    setClassFilter('');
     setStatusFilter('');
     setStartDate('');
     setEndDate('');
@@ -102,14 +117,14 @@ const Reports = () => {
     <div className="space-y-6">
       {/* Analytics Summary Header */}
       {loadingStats ? (
-        <LoadingSpinner message="Aggregating performance insights..." />
+        <LoadingSpinner message="Aggregating attendance analytics..." />
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="card p-5 border-l-4 border-l-blue-600">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  Total Logged Entries
+                  {isTeacher ? 'My Recorded Entries' : 'Total System Entries'}
                 </p>
                 <p className="text-3xl font-extrabold text-gray-900 mt-1">
                   {stats?.totalAttendance ?? 0}
@@ -177,10 +192,12 @@ const Reports = () => {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <TrendingUp className="text-blue-600" size={20} />
-              <h3 className="text-base font-bold text-gray-900">Attendance Distribution (Last 7 Days)</h3>
+              <h3 className="text-base font-bold text-gray-900">
+                {isTeacher ? 'My Classes Attendance Rate (7 Days)' : 'Institution Attendance Rate (7 Days)'}
+              </h3>
             </div>
             <span className="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg">
-              Historical Trend
+              Historical Distribution
             </span>
           </div>
 
@@ -219,9 +236,9 @@ const Reports = () => {
         <div className="p-6 border-b border-gray-100 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h3 className="text-base font-bold text-gray-900">Attendance History Logs</h3>
+              <h3 className="text-base font-bold text-gray-900">Attendance Log History</h3>
               <p className="text-xs text-gray-500 mt-0.5">
-                Total {totalRecords} records found
+                Total {totalRecords} records found {isTeacher && 'for your classes'}
               </p>
             </div>
 
@@ -233,18 +250,35 @@ const Reports = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2">
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
               <input
                 type="text"
-                placeholder="Search student or course..."
+                placeholder="Search student or class..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="input-field pl-10 text-xs"
               />
             </div>
+
+            {/* Class Filter */}
+            <select
+              value={classFilter}
+              onChange={(e) => {
+                setClassFilter(e.target.value);
+                setPage(1);
+              }}
+              className="input-field text-xs bg-white font-medium"
+            >
+              <option value="">{isTeacher ? 'All My Classes' : 'All Classes'}</option>
+              {classes.map((cls) => (
+                <option key={cls._id} value={cls._id}>
+                  {cls.name}
+                </option>
+              ))}
+            </select>
 
             {/* Status Filter */}
             <select
@@ -297,7 +331,7 @@ const Reports = () => {
         ) : filteredHistory.length === 0 ? (
           <EmptyState
             title="No Attendance Logs Found"
-            description="Try changing the date range or status filters."
+            description="Try changing the date range, class, or status filters."
           />
         ) : (
           <div className="overflow-x-auto">
@@ -305,7 +339,8 @@ const Reports = () => {
               <thead>
                 <tr className="bg-gray-50/75 border-b border-gray-100 text-xs uppercase tracking-wider text-gray-500 font-semibold">
                   <th className="py-3 px-6">Student</th>
-                  <th className="py-3 px-6">Course / Class</th>
+                  <th className="py-3 px-6">Class</th>
+                  {isAdmin && <th className="py-3 px-6">Recorded By</th>}
                   <th className="py-3 px-6">Date</th>
                   <th className="py-3 px-6">Status</th>
                   <th className="py-3 px-6">Notes</th>
@@ -320,9 +355,14 @@ const Reports = () => {
                       </div>
                       <div className="text-xs text-gray-400">{rec.student?.email}</div>
                     </td>
-                    <td className="py-3.5 px-6 text-xs text-gray-600">
-                      {rec.student?.course || 'General'}
+                    <td className="py-3.5 px-6 text-xs text-gray-700 font-medium">
+                      {rec.classId?.name || rec.student?.course || 'General'}
                     </td>
+                    {isAdmin && (
+                      <td className="py-3.5 px-6 text-xs text-gray-500">
+                        {rec.teacherId?.name || 'Administrator'}
+                      </td>
+                    )}
                     <td className="py-3.5 px-6 text-xs text-gray-600 font-medium">
                       {formatDate(rec.date)}
                     </td>

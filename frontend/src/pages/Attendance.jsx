@@ -6,11 +6,12 @@ import {
   Clock,
   Search,
   Save,
-  CheckCheck,
+  BookOpen,
   RefreshCw,
   Info
 } from 'lucide-react';
-import { studentsApi, attendanceApi } from '../services/api';
+import { studentsApi, attendanceApi, classesApi } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
 import { useToast } from '../components/Toast';
@@ -23,30 +24,60 @@ const STATUSES = [
 ];
 
 const Attendance = () => {
+  const { isTeacher, isAdmin } = useAuth();
   const [selectedDate, setSelectedDate] = useState(getTodayString());
+  const [classes, setClasses] = useState([]);
+  const [selectedClassId, setSelectedClassId] = useState('');
   const [students, setStudents] = useState([]);
-  const [attendanceMap, setAttendanceMap] = useState({}); // { [studentId]: 'Present' | 'Late' | 'Absent' }
-  const [loading, setLoading] = useState(true);
+  const [attendanceMap, setAttendanceMap] = useState({});
+  const [loadingClasses, setLoadingClasses] = useState(true);
+  const [loadingRoster, setLoadingRoster] = useState(false);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
-  const [selectedCourse, setSelectedCourse] = useState('');
 
   const toast = useToast();
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
+  // 1. Load available classes
+  useEffect(() => {
+    const fetchClasses = async () => {
+      try {
+        setLoadingClasses(true);
+        const res = await classesApi.getAll();
+        if (res.success && res.data.length > 0) {
+          setClasses(res.data);
+          setSelectedClassId(res.data[0]._id);
+        } else {
+          setClasses([]);
+        }
+      } catch (err) {
+        toast.error('Failed to load class list');
+      } finally {
+        setLoadingClasses(false);
+      }
+    };
 
-      // Fetch active students and existing attendance for the chosen date concurrently
+    fetchClasses();
+  }, []);
+
+  // 2. Load student roster & existing attendance when date or class changes
+  const loadRoster = async () => {
+    if (!selectedClassId) {
+      setStudents([]);
+      setAttendanceMap({});
+      return;
+    }
+
+    try {
+      setLoadingRoster(true);
+
       const [studentsRes, attendanceRes] = await Promise.all([
-        studentsApi.getAll({ status: 'Active' }),
-        attendanceApi.getAll({ date: selectedDate, limit: 200 })
+        studentsApi.getAll({ classId: selectedClassId, status: 'Active' }),
+        attendanceApi.getAll({ date: selectedDate, classId: selectedClassId, limit: 200 })
       ]);
 
       const activeStudents = studentsRes.data || [];
       setStudents(activeStudents);
 
-      // Populate existing attendance records map
       const mapped = {};
       if (attendanceRes.data) {
         attendanceRes.data.forEach((rec) => {
@@ -59,15 +90,17 @@ const Attendance = () => {
 
       setAttendanceMap(mapped);
     } catch (err) {
-      toast.error(err.message || 'Error loading attendance roster');
+      toast.error(err.message || 'Error loading attendance records');
     } finally {
-      setLoading(false);
+      setLoadingRoster(false);
     }
   };
 
   useEffect(() => {
-    loadData();
-  }, [selectedDate]);
+    if (selectedClassId) {
+      loadRoster();
+    }
+  }, [selectedDate, selectedClassId]);
 
   const handleMarkStatus = (studentId, status) => {
     setAttendanceMap((prev) => ({
@@ -82,13 +115,19 @@ const Attendance = () => {
       nextMap[student._id] = status;
     });
     setAttendanceMap(nextMap);
-    toast.info(`Marked ${filteredStudents.length} students as ${status}`);
+    toast.info(`Marked all ${filteredStudents.length} students as ${status}`);
   };
 
   const handleSaveAttendance = async () => {
+    if (!selectedClassId) {
+      toast.warning('Please select a class first');
+      return;
+    }
+
     const records = Object.entries(attendanceMap).map(([studentId, status]) => ({
       student: studentId,
       date: selectedDate,
+      classId: selectedClassId,
       status
     }));
 
@@ -99,10 +138,10 @@ const Attendance = () => {
 
     try {
       setSaving(true);
-      const res = await attendanceApi.bulkCreate(records);
+      const res = await attendanceApi.bulkCreate(records, selectedClassId);
       if (res.success) {
         toast.success(`Successfully saved attendance for ${records.length} students`);
-        loadData();
+        loadRoster();
       }
     } catch (err) {
       toast.error(err.message || 'Failed to save attendance');
@@ -111,30 +150,65 @@ const Attendance = () => {
     }
   };
 
-  // Filter students based on search and course
   const filteredStudents = students.filter((student) => {
-    const matchesSearch =
-      student.fullName.toLowerCase().includes(search.toLowerCase()) ||
-      student.email.toLowerCase().includes(search.toLowerCase());
-    const matchesCourse = selectedCourse ? student.course === selectedCourse : true;
-    return matchesSearch && matchesCourse;
+    const term = search.toLowerCase();
+    return (
+      student.fullName.toLowerCase().includes(term) ||
+      student.email.toLowerCase().includes(term)
+    );
   });
 
-  // Calculate live counters
-  const totalStudents = filteredStudents.length;
   const markedPresent = filteredStudents.filter((s) => attendanceMap[s._id] === 'Present').length;
   const markedLate = filteredStudents.filter((s) => attendanceMap[s._id] === 'Late').length;
   const markedAbsent = filteredStudents.filter((s) => attendanceMap[s._id] === 'Absent').length;
-  const unrecorded = totalStudents - (markedPresent + markedLate + markedAbsent);
+  const unrecorded = filteredStudents.length - (markedPresent + markedLate + markedAbsent);
+
+  if (loadingClasses) {
+    return <LoadingSpinner message="Loading classes..." />;
+  }
+
+  if (classes.length === 0) {
+    return (
+      <EmptyState
+        icon={BookOpen}
+        title={isTeacher ? 'No Assigned Classes' : 'No Classes Created'}
+        description={
+          isTeacher
+            ? 'You are not currently assigned as the instructor for any class cohorts. Please contact the administrator.'
+            : 'Create classes in the Classes page before recording attendance.'
+        }
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Date & Control Panel */}
+      {/* Date & Class Selection Panel */}
       <div className="card p-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3">
+            {/* Class Selector Dropdown */}
+            <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl">
+              <BookOpen size={18} className="text-blue-600 flex-shrink-0" />
+              <label className="text-xs font-bold text-blue-900 uppercase tracking-wider">
+                Class:
+              </label>
+              <select
+                value={selectedClassId}
+                onChange={(e) => setSelectedClassId(e.target.value)}
+                className="bg-transparent text-sm font-bold text-blue-950 focus:outline-none cursor-pointer"
+              >
+                {classes.map((cls) => (
+                  <option key={cls._id} value={cls._id} className="text-gray-900">
+                    {cls.name} ({cls.grade} - Sec {cls.section})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Date Picker */}
             <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl">
-              <CalendarIcon size={18} className="text-blue-600 flex-shrink-0" />
+              <CalendarIcon size={18} className="text-gray-500 flex-shrink-0" />
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 Date:
               </label>
@@ -147,9 +221,9 @@ const Attendance = () => {
             </div>
 
             <button
-              onClick={loadData}
+              onClick={loadRoster}
               className="btn-secondary"
-              title="Reload attendance data"
+              title="Reload roster"
             >
               <RefreshCw size={16} />
               <span className="hidden sm:inline">Refresh</span>
@@ -226,43 +300,33 @@ const Attendance = () => {
         </div>
       </div>
 
-      {/* Roster Filter Bar */}
-      <div className="card p-4 flex flex-col sm:flex-row gap-3 items-center justify-between">
-        <div className="relative flex-1 w-full max-w-sm">
+      {/* Roster Search Bar */}
+      <div className="card p-4 flex items-center justify-between">
+        <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
           <input
             type="text"
-            placeholder="Search student in roster..."
+            placeholder="Search student in class roster..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="input-field pl-10"
           />
         </div>
 
-        <select
-          value={selectedCourse}
-          onChange={(e) => setSelectedCourse(e.target.value)}
-          className="input-field w-full sm:w-auto text-xs font-medium bg-white"
-        >
-          <option value="">All Cohorts / Classes</option>
-          <option value="Full-Stack Web Development">Web Development</option>
-          <option value="Data Science & AI">Data Science & AI</option>
-          <option value="UI/UX Product Design">UI/UX Design</option>
-          <option value="Cybersecurity Analyst">Cybersecurity</option>
-          <option value="Cloud & DevOps Engineering">Cloud & DevOps</option>
-          <option value="Mobile App Development">Mobile App Dev</option>
-        </select>
+        <div className="text-xs font-medium text-gray-500">
+          Enrolled in Class: <span className="font-bold text-gray-800">{students.length}</span>
+        </div>
       </div>
 
-      {/* Students Attendance Table */}
+      {/* Class Attendance Roster Table */}
       <div className="card overflow-hidden">
-        {loading ? (
-          <LoadingSpinner message="Fetching roster for selected date..." />
+        {loadingRoster ? (
+          <LoadingSpinner message="Fetching students for selected class..." />
         ) : filteredStudents.length === 0 ? (
           <EmptyState
-            icon={CheckCheck}
-            title="No Active Students Found"
-            description="Ensure you have active students enrolled in this course to mark attendance."
+            icon={BookOpen}
+            title="No Active Students Enrolled"
+            description="There are currently no active students assigned to this class cohort."
           />
         ) : (
           <div className="overflow-x-auto">
@@ -270,8 +334,7 @@ const Attendance = () => {
               <thead>
                 <tr className="bg-gray-50/75 border-b border-gray-100 text-xs uppercase tracking-wider text-gray-500 font-semibold">
                   <th className="py-3.5 px-6">Student</th>
-                  <th className="py-3.5 px-6 hidden sm:table-cell">Class / Program</th>
-                  <th className="py-3.5 px-6">Status Indicator</th>
+                  <th className="py-3.5 px-6 hidden sm:table-cell">Status Indicator</th>
                   <th className="py-3.5 px-6 text-right">Attendance Action</th>
                 </tr>
               </thead>
@@ -296,13 +359,8 @@ const Attendance = () => {
                         </div>
                       </td>
 
-                      {/* Course */}
-                      <td className="py-4 px-6 text-gray-600 hidden sm:table-cell text-xs font-medium">
-                        {student.course}
-                      </td>
-
                       {/* Status indicator badge */}
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-6 hidden sm:table-cell">
                         {currentStatus ? (
                           <span
                             className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${

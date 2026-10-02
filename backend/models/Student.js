@@ -27,8 +27,13 @@ const studentSchema = new mongoose.Schema({
   },
   course: {
     type: String,
-    required: [true, 'Course/Class is required'],
-    trim: true
+    trim: true,
+    default: 'General'
+  },
+  classId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Class',
+    default: null
   },
   enrollmentDate: {
     type: Date,

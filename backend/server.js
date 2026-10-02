@@ -15,7 +15,7 @@ const app = express();
 // Middleware
 app.use(cors({
   origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
@@ -23,10 +23,16 @@ app.use(express.urlencoded({ extended: true }));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok', message: 'AttendFlow API is healthy and operational' });
+  res.status(200).json({
+    status: 'ok',
+    message: 'Smart Academy Multi-Teacher Attendance System API is operational'
+  });
 });
 
 // Mount Routes
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/teachers', require('./routes/teachers'));
+app.use('/api/classes', require('./routes/classes'));
 app.use('/api/students', require('./routes/students'));
 app.use('/api/attendance', require('./routes/attendance'));
 app.use('/api/dashboard', require('./routes/dashboard'));
@@ -46,7 +52,7 @@ const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`===============================================`);
-  console.log(` AttendFlow Backend running on port ${PORT}`);
+  console.log(` Smart Academy Attendance Server on port ${PORT}`);
   console.log(` Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`===============================================`);
 });

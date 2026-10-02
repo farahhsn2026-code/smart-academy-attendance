@@ -1,19 +1,27 @@
-# 🎓 AttendFlow — Modern Student Attendance Management System
+# 🎓 Smart Academy — Secure Multi-Teacher Student Attendance Management System
 
-**AttendFlow** is a modern, responsive web application designed for bootcamps, universities, and training academies to manage student cohorts and record daily attendance seamlessly.
-
-Built as a full-stack **MERN (MongoDB, Express.js, React, Node.js)** solution with **Vite** and **Tailwind CSS**.
+**Smart Academy Student Attendance Management System** is a secure, full-stack **MERN (MongoDB Atlas, Express.js, React, Node.js)** platform engineered for schools, academies, and bootcamps with complete **role-based multi-teacher authentication**.
 
 ---
 
-## 🌟 Key Features
+## 🌟 Key Architecture & Multi-Teacher Capabilities
 
-- **📊 Dynamic Dashboard**: Real-time KPI summary cards (*Total Students, Present Today, Absent Today, Late Today*), 7-day attendance volume distribution chart, and cumulative engagement percentage.
-- **👨‍🎓 Student Management (CRUD)**: Add new students, view full profiles, edit information, and delete students with confirmation dialogs. Includes instant live search and multi-criteria filters (course & status).
-- **📋 Daily Attendance Marking**: Select any calendar date and mark students as **Present**, **Absent**, or **Late** with one-click actions. Includes bulk actions (*All Present, All Late, All Absent*) and duplicate prevention.
-- **📈 Historical Reports & Logs**: Query historical attendance by date range or status, complete with pagination, search, and breakdown statistics.
-- **⚙️ Settings & Configuration**: Configure institution profile, academic term, attendance grace periods, and view architecture health.
-- **🎨 Modern UI/UX**: Clean SaaS-style interface, toast notifications, responsive mobile drawer, loading spinners, and friendly empty states.
+### 🛡️ Role-Based Access Control (RBAC)
+- **Administrator (`admin`)**:
+  - Full institutional authority.
+  - **Faculty Management**: Create, edit, activate/deactivate teachers, reset passwords, and assign classes.
+  - **Class Management**: Create grade cohorts and sections, allocate instructors, and monitor rosters.
+  - **Student Directory**: Full CRUD across all academic classes.
+  - **Attendance & Analytics**: View and audit attendance across all teachers, classes, and date ranges.
+  - **System Settings**: Control attendance policies, academic term definitions, and institution parameters.
+
+- **Teacher (`teacher`)**:
+  - **Isolated Workspaces**: Teachers can log in securely to access **only their assigned classes**.
+  - **Student Roster**: View and add/edit students enrolled strictly in their classes (student deletion restricted to Admin).
+  - **Daily Attendance**: Select an assigned class, review live presence metrics, and mark **Present**, **Late**, or **Absent** with duplicate-prevention.
+  - **Class Reports**: Access attendance histories and 7-day volume trends scoped exclusively to their students.
+  - **Access Security**: Backend enforces class ownership checks on all endpoints (`403 Forbidden` if attempting to query or mark another teacher's class).
+  - **Staff Profile**: Update personal password securely.
 
 ---
 
@@ -22,71 +30,92 @@ Built as a full-stack **MERN (MongoDB, Express.js, React, Node.js)** solution wi
 | Layer | Technology |
 |---|---|
 | **Frontend** | React 18, Vite, React Router 6, Tailwind CSS, Lucide Icons, Axios |
-| **Backend** | Node.js, Express.js, REST API Architecture |
-| **Database** | MongoDB, Mongoose ODM |
-| **Styling** | Tailwind CSS with custom color scheme and responsive layout |
+| **Backend** | Node.js, Express.js, JWT (JSON Web Tokens), bcryptjs |
+| **Database** | MongoDB Atlas (Cloud Database) + Mongoose ODM |
+| **Deployment** | Render Web Service (Backend) & Render Static Site (Frontend) |
+
+---
+
+## 🔑 Default Credentials (Development & Testing)
+
+| Role | Email | Password | Access Level |
+|---|---|---|---|
+| **Administrator** | `hasanfaarah07@gmail.com` | `Admin@123456` | Full institutional control |
+| **Teacher 1** | `ahmed.hassan@smartacademy.edu` | `Teacher@123456` | Grade 8A & Web Dev Cohort |
+| **Teacher 2** | `fatima.ali@smartacademy.edu` | `Teacher@123456` | Grade 9B |
+
+*(Note: These sample accounts are populated idempotently via `npm run seed` in the backend).*
 
 ---
 
 ## 📂 Project Architecture
 
 ```
-AttendFlow/
+smart-academy-attendance/
 ├── backend/
 │   ├── config/
-│   │   └── db.js                 # MongoDB connection logic
+│   │   └── db.js                 # MongoDB Atlas connection
 │   ├── controllers/
-│   │   ├── attendanceController.js # Attendance logic & bulk updates
-│   │   ├── dashboardController.js  # Dashboard aggregations & trends
-│   │   └── studentController.js   # Student CRUD operations
+│   │   ├── authController.js       # Login, profile, password changes
+│   │   ├── teacherController.js    # Admin faculty management
+│   │   ├── classController.js      # Class cohorts & teacher allocations
+│   │   ├── studentController.js    # Scoped student CRUD with class checks
+│   │   ├── attendanceController.js # Scoped attendance marking & bulk logs
+│   │   └── dashboardController.js  # Role-specific analytics aggregations
 │   ├── middleware/
-│   │   └── errorHandler.js        # Global error & duplicate key handler
+│   │   ├── auth.js               # JWT verification & role guards (requireAuth, requireAdmin)
+│   │   └── errorHandler.js       # Centralized error handler
 │   ├── models/
-│   │   ├── Attendance.js          # Attendance schema with unique index
-│   │   └── Student.js             # Student schema with validation
+│   │   ├── User.js               # Admin & Teacher schema with bcrypt hashing & JWT methods
+│   │   ├── Class.js              # Class cohort schema with teacher references
+│   │   ├── Student.js            # Student schema with classId reference
+│   │   └── Attendance.js         # Daily attendance with classId & teacherId references
 │   ├── routes/
-│   │   ├── attendance.js          # /api/attendance routes
-│   │   ├── dashboard.js           # /api/dashboard routes
-│   │   └── students.js            # /api/students routes
-│   ├── .env.example               # Backend environment template
-│   ├── .env                       # Local environment variables
+│   │   ├── auth.js               # /api/auth
+│   │   ├── teachers.js           # /api/teachers (Admin guarded)
+│   │   ├── classes.js            # /api/classes (Role guarded)
+│   │   ├── students.js           # /api/students (Role guarded)
+│   │   ├── attendance.js         # /api/attendance (Ownership validated)
+│   │   └── dashboard.js          # /api/dashboard (Role guarded)
+│   ├── .env                      # Environment config (MongoDB Atlas, JWT_SECRET)
+│   ├── .env.example
 │   ├── package.json
-│   ├── seed.js                    # Demo dataset generator (12 students + history)
-│   └── server.js                  # Express application entrypoint
+│   ├── seed.js                   # Safe idempotent seeder for Admin, Teachers, and Classes
+│   └── server.js                 # Express application entrypoint
 │
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── ConfirmDialog.jsx  # Reusable confirmation modal
-│   │   │   ├── EmptyState.jsx     # Friendly zero-data screens
-│   │   │   ├── Header.jsx         # Top application header
-│   │   │   ├── LoadingSpinner.jsx # Spinners & skeleton loaders
-│   │   │   ├── Modal.jsx          # Accessible dialog overlay
-│   │   │   ├── Sidebar.jsx        # Navigation sidebar with responsive drawer
-│   │   │   ├── StatCard.jsx       # Dashboard summary KPI cards
-│   │   │   ├── StudentForm.jsx    # Form for adding/editing students
-│   │   │   └── Toast.jsx          # Toast notification provider
-│   │   ├── hooks/
-│   │   │   ├── useAttendance.js   # Attendance data fetch hook
-│   │   │   └── useStudents.js     # Student directory fetch hook
+│   │   │   ├── ConfirmDialog.jsx # Reusable destructive confirmation modal
+│   │   │   ├── EmptyState.jsx    # Zero-data feedback screens
+│   │   │   ├── Header.jsx        # Dynamic header with staff role badge & logout
+│   │   │   ├── LoadingSpinner.jsx
+│   │   │   ├── Modal.jsx         # Accessible overlay dialog
+│   │   │   ├── ProtectedRoute.jsx# Auth & role-based route guard
+│   │   │   ├── Sidebar.jsx       # Dynamic role-based navigation sidebar
+│   │   │   ├── StatCard.jsx      # Summary KPI cards
+│   │   │   ├── StudentForm.jsx   # Form with class allocation
+│   │   │   └── Toast.jsx         # Toast notification provider
+│   │   ├── context/
+│   │   │   └── AuthContext.jsx   # Global user state & token manager
 │   │   ├── layouts/
-│   │   │   └── MainLayout.jsx     # Master layout container
+│   │   │   └── MainLayout.jsx    # Responsive layout shell
 │   │   ├── pages/
-│   │   │   ├── Attendance.jsx     # Daily marking page
-│   │   │   ├── Dashboard.jsx      # Metrics & visual charts
-│   │   │   ├── Reports.jsx        # Attendance history & analytics
-│   │   │   ├── Settings.jsx       # Configuration & tech specs
-│   │   │   └── Students.jsx       # Student directory & CRUD
+│   │   │   ├── Attendance.jsx    # Daily roster marking with class selector
+│   │   │   ├── Classes.jsx       # Academic class cohorts & assignments
+│   │   │   ├── Dashboard.jsx     # Role-aware dashboard (System vs Teacher metrics)
+│   │   │   ├── Login.jsx         # Smart Academy login with quick-fill demo buttons
+│   │   │   ├── Profile.jsx       # Staff profile view & password update
+│   │   │   ├── Reports.jsx       # Scoped attendance logs & 7-day distribution
+│   │   │   ├── Settings.jsx      # Admin system configuration
+│   │   │   └── Teachers.jsx      # Admin teacher management
 │   │   ├── services/
-│   │   │   └── api.js             # Axios API client & interceptors
-│   │   ├── utils/
-│   │   │   └── helpers.js         # Date formatting & badge helper
-│   │   ├── App.jsx                # Router setup
-│   │   ├── index.css              # Tailwind base & utility styling
-│   │   └── main.jsx               # React DOM entry
+│   │   │   └── api.js            # Axios client with JWT Bearer interceptor
+│   │   ├── App.jsx               # Protected client-side routing
+│   │   ├── index.css             # Tailwind base & utilities
+│   │   └── main.jsx
 │   ├── index.html
 │   ├── package.json
-│   ├── postcss.config.js
 │   ├── tailwind.config.js
 │   └── vite.config.js
 │
@@ -96,152 +125,79 @@ AttendFlow/
 
 ---
 
-## 🚀 Step-by-Step Installation & Setup
+## 🚀 Running the System Locally
 
-### Prerequisites
-Make sure you have installed on your computer:
-1. **Node.js** (v16 or higher) — [Download Node.js](https://nodejs.org)
-2. **MongoDB** (Local Community Server or a free [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) cluster)
-
----
-
-### Step 1: Clone or Open the Project
-Open a terminal in the project directory:
+### Step 1: Backend Setup
 ```bash
-cd "student attendance ms"
+cd backend
+npm install
+
+# Run database seed (Creates Admin, sample Teachers, Classes & links legacy students)
+npm run seed
+
+# Start server
+npm run dev
 ```
+Backend runs at `http://localhost:5000`.
 
----
-
-### Step 2: Set Up Backend
-
-1. Navigate to the backend folder:
-   ```bash
-   cd backend
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Configure Environment Variables:
-   The backend includes a `.env` file already pre-configured for local MongoDB:
-   ```env
-   PORT=5000
-   MONGODB_URI=mongodb://localhost:27017/attendflow
-   NODE_ENV=development
-   ```
-   *(If using MongoDB Atlas, replace `MONGODB_URI` with your connection string).*
-
-4. **Populate Demo Seed Data** (Recommended for presentation):
-   Run the seed script to automatically load **12 demo students** across different cohorts and **10 days of realistic attendance history**:
-   ```bash
-   npm run seed
-   ```
-
-5. Start the Backend Server:
-   ```bash
-   npm run dev
-   ```
-   Your backend API will now be running at: `http://localhost:5000`
-
----
-
-### Step 3: Set Up Frontend
-
-1. Open a new terminal window and navigate to the `frontend` folder:
-   ```bash
-   cd frontend
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Start the Frontend Development Server:
-   ```bash
-   npm run dev
-   ```
-
-4. Open your browser and visit:
-   ```
-   http://localhost:5173
-   ```
-
----
-
-## 📡 REST API Documentation
-
-### Student Endpoints (`/api/students`)
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/students` | Get all students (supports `?search=`, `?course=`, `?status=`) |
-| `GET` | `/api/students/:id` | Get details of a single student by ID |
-| `POST` | `/api/students` | Add a new student record |
-| `PUT` | `/api/students/:id` | Update an existing student |
-| `DELETE` | `/api/students/:id` | Delete student and their attendance history |
-
-### Attendance Endpoints (`/api/attendance`)
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/attendance` | Get attendance logs (supports `?date=`, `?status=`, `?page=`, `?startDate=`, `?endDate=`) |
-| `POST` | `/api/attendance` | Record individual student attendance |
-| `POST` | `/api/attendance/bulk` | Bulk record/update attendance roster for a date |
-| `PUT` | `/api/attendance/:id` | Edit specific attendance entry |
-| `DELETE` | `/api/attendance/:id` | Remove attendance record |
-
-### Dashboard Analytics (`/api/dashboard`)
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/dashboard/stats` | Calculates today's attendance, 7-day trends, and totals |
-
----
-
-## 💡 How to Demonstrate During Bootcamp Presentation
-
-1. **Dashboard Walkthrough**:
-   - Showcase the real-time KPI cards (*Total Students, Present, Absent, Late*).
-   - Point out the 7-day attendance distribution chart and circular overall engagement gauge.
-2. **Student Management**:
-   - Click **Add Student** to create a student with instant validation.
-   - Use the live search bar to filter by name or course.
-   - Click the **View Profile** eye icon, followed by the **Edit** action.
-3. **Attendance Taking**:
-   - Navigate to the **Attendance** page.
-   - Pick today's date (or any date).
-   - Use the **All Present** quick button, toggle a couple to **Late** or **Absent**, and hit **Save Attendance**.
-   - Notice the toast confirmation and automatic status recalculations.
-4. **Reports & Audit Trail**:
-   - Go to **Reports** to show the paginated history of past logs with date range filtering.
-
----
-
-## 📦 How to Upload to GitHub
-
-Follow these simple commands to push your project to a GitHub repository:
-
+### Step 2: Frontend Setup
+Open a second terminal:
 ```bash
-# 1. Initialize git from the root folder
-git init
+cd frontend
+npm install
 
-# 2. Add all project files
-git add .
-
-# 3. Commit the changes
-git commit -m "feat: complete AttendFlow student attendance management system"
-
-# 4. Create a new repository on GitHub (e.g. attendflow)
-# 5. Link your local repo to GitHub
-git remote add origin https://github.com/YOUR_USERNAME/attendflow.git
-
-# 6. Push to the main branch
-git branch -M main
-git push -u origin main
+# Start Vite dev server
+npm run dev
 ```
+Open `http://localhost:5173` in your browser.
+
+---
+
+## 🧪 Multi-Teacher Verification Workflow
+
+### Test 1: Administrator Full Access
+1. Open `http://localhost:5173/login`.
+2. Click **Admin Portal** demo quick-fill button (`hasanfaarah07@gmail.com` / `Admin@123456`) and click **Log In**.
+3. Verify you can access **Dashboard**, **Teachers**, **Classes**, **Students**, **Attendance**, **Reports**, and **Settings**.
+4. Create a new teacher and assign them to a class.
+
+### Test 2: Teacher A Isolation
+1. Sign out and log in with Teacher A (`ahmed.hassan@smartacademy.edu` / `Teacher@123456`).
+2. Notice the navigation changes to **Dashboard**, **My Classes**, **My Students**, **Attendance**, **Reports**, **My Profile**.
+3. Admin-only links (**Teachers**, **Settings**) are hidden.
+4. On **Attendance**, verify only Teacher A's assigned classes appear in the selector.
+5. Save attendance for a class.
+6. Open **Reports** and verify only records for Teacher A's students are visible.
+
+### Test 3: Teacher B Isolation
+1. Sign out and log in with Teacher B (`fatima.ali@smartacademy.edu` / `Teacher@123456`).
+2. Verify Teacher B cannot see Teacher A's students or classes.
+3. Attempting to manually navigate to `http://localhost:5173/teachers` will automatically redirect to `/dashboard`.
+
+---
+
+## 🌐 Render Deployment Configuration
+
+### Frontend (Render Static Site)
+- **Build Command**: `npm install && npm run build`
+- **Publish Directory**: `dist`
+- **Environment Variables**:
+  - `VITE_API_URL`: `https://YOUR_BACKEND_SERVICE.onrender.com/api`
+- **Rewrite Rule**:
+  - Source: `/*`
+  - Destination: `/index.html`
+  - Action: `Rewrite`
+
+### Backend (Render Web Service)
+- **Build Command**: `npm install`
+- **Start Command**: `node server.js`
+- **Environment Variables**:
+  - `MONGODB_URI`: `mongodb+srv://...`
+  - `JWT_SECRET`: `smart_academy_super_secret_jwt_key_2026_secure`
+  - `JWT_EXPIRES_IN`: `7d`
+  - `PORT`: `10000` (Render default)
 
 ---
 
 ## 📄 License
-This project is licensed under the MIT License — free for educational, bootcamp, and commercial portfolio use.
+This project is licensed under the MIT License for Smart Academy.

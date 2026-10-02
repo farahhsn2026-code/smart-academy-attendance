@@ -7,6 +7,10 @@ const {
   updateStudent,
   deleteStudent
 } = require('../controllers/studentController');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
+
+// All student routes require authentication
+router.use(requireAuth);
 
 router.route('/')
   .get(getStudents)
@@ -15,6 +19,6 @@ router.route('/')
 router.route('/:id')
   .get(getStudent)
   .put(updateStudent)
-  .delete(deleteStudent);
+  .delete(requireAdmin, deleteStudent); // Only Admin can delete students
 
 module.exports = router;
