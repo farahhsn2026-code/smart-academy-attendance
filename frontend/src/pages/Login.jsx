@@ -141,33 +141,6 @@ const Login = () => {
             </div>
           </form>
 
-          {/* Quick Demo Access Bar */}
-          <div className="mt-6 pt-5 border-t border-gray-100">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 mb-2.5">
-              <ShieldCheck size={14} className="text-blue-600" />
-              <span>Demo Quick-Fill Accounts:</span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => handleQuickFill('hasanfaarah07@gmail.com', 'Admin@123456')}
-                className="p-2 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-100 font-medium text-left transition-colors"
-              >
-                <span className="block font-bold">Admin Portal</span>
-                <span className="text-[11px] text-blue-500 truncate block">hasanfaarah07...</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickFill('ahmed.hassan@smartacademy.edu', 'Teacher@123456')}
-                className="p-2 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-100 font-medium text-left transition-colors"
-              >
-                <span className="block font-bold">Teacher Portal</span>
-                <span className="text-[11px] text-emerald-600 truncate block">ahmed.hassan...</span>
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Footer info */}
